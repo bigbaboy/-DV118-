@@ -1,0 +1,223 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân tích Doanh số Superstore (D3.js)</title>
+
+    {# ĐẢM BẢO ĐƯỜNG DẪN D3.js VÀ CSS ĐÚNG #}
+    <script src="{% static 'dashboard_app/js/d3.min.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'dashboard_app/css/style.css' %}">
+
+    <style>
+        /* Các style nội tuyến từ các phản hồi trước của bạn */
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f8f9fa; }
+        h1 { text-align: center; color: #333; }
+        .tabs { margin-bottom: 20px; text-align: center; padding: 10px 0; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .tab-button {
+            padding: 10px 18px; margin: 0 5px; cursor: pointer;
+            background-color: #e9ecef; color: #495057;
+            border: 1px solid #ced4da; border-radius: 5px;
+            font-size: 0.9em; transition: background-color 0.2s, color 0.2s;
+        }
+        .tab-button:hover { background-color: #d1d9e0; }
+        .tab-button.active {
+            background-color: #007bff; color: white; border-color: #007bff;
+            font-weight: bold;
+        }
+        .chart-container {
+            width: 95%; max-width: 1100px; margin: 30px auto;
+            border: 1px solid #dee2e6; border-radius: 8px;
+            min-height: 550px; position: relative;
+            background-color: #fff; padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .chart { display: none; width: 100%; height: 100%; }
+        .chart.active { display: block; }
+        .visualization-tooltip {
+            position: absolute; text-align: left; padding: 8px;
+            font: 12px sans-serif; background: rgba(0,0,0,0.8); color: white;
+            border: 0px; border-radius: 4px; pointer-events: none;
+            opacity: 0; z-index: 1000;
+        }
+        .chart-title-placeholder {
+            display: flex; align-items: center; justify-content: center;
+            height: 500px; /* Hoặc chiều cao phù hợp với vùng biểu đồ */
+            color: #aaa; font-style: italic; font-size: 1.2em;
+        }
+        #current-chart-label {
+            text-align: center; font-size: 1.5em; color: #333; margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>[221124029109][221124029120][221124029121] - Superstore Dashboard</h1>
+
+    {# Các nút tab #}
+    <div class="tabs">
+        <button class="tab-button" onclick="showChart('TQ1', 'Biểu đồ TQ1: Top 10 Doanh thu Quốc gia')">TQ1</button>
+        <button class="tab-button" onclick="showChart('TQ2', 'Biểu đồ TQ2: Doanh thu theo doanh mục sản phẩm con')">TQ2</button>
+        <button class="tab-button" onclick="showChart('TQ3', 'Biểu đồ TQ3: Doanh thu theo Phân khúc khách hàng')">TQ3</button>
+        <button class="tab-button" onclick="showChart('Q1', 'Tổng quan doanh thu và biên lợi nhuận theo quốc gia ')">Sale&Profit 1</button>
+        <button class="tab-button" onclick="showChart('Q2', 'Phân tích theo bang và thành phố ')">Sale&Profit 2</button>
+        <button class="tab-button" onclick="showChart('Q3', 'Phân tích chi tiết sản phẩm theo Sub-category và tên sản phẩm ')">Sale&Profit 3</button>
+        <button class="tab-button" onclick="showChart('Q4', 'Biểu đồ Tree Map chi tiết sản phẩm')">Sale&Profit 4</button>
+        <button class="tab-button" onclick="showChart('Q5', 'Tỷ lệ Doanh thu theo Danh mục sản phẩm')">Segment 1</button>
+        <button class="tab-button" onclick="showChart('Q6', 'Số lần mua hàng theo phân khúc khách hàng')">Segment 2</button>
+        <button class="tab-button active" onclick="showChart('Q7', 'Giá trị trung bình đơn hàng theo phân khúc khách hàng')">Segment 3</button> {# Active by default for testing Q7 #}
+        <button class="tab-button" onclick="showChart('Q8', 'Phân phối lượt mua hàng theo phân khúc khách hàng và khoảng mua hàng')">Segment 4</button>
+        <button class="tab-button" onclick="showChart('Q9', 'Tỷ lệ Doanh thu theo Danh mục sản phẩm')">Product1</button>
+        <button class="tab-button" onclick="showChart('Q10', 'Doanh thu Danh mục Sản phẩm con theo Tháng')">Product 2</button>
+        <button class="tab-button" onclick="showChart('Q11', 'Tỷ suất LN theo Danh mục Sản phẩm con')">Product 3</button>
+        <button class="tab-button" onclick="showChart('Q12', 'Doanh thu và tỷ lệ trả hàng theo sản phẩm')">Product 4</button>
+        <button class="tab-button" onclick="showChart('Q13', 'Tương quan lợi nhuận và chiết khấu')">Product 5</button>
+    </div>
+
+    {# Các div chứa biểu đồ #}
+    <div class="chart-container">
+        <h3 id="current-chart-label">Vui lòng chọn một "Q" để xem biểu đồ</h3>
+        <div id="chartTQ1" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ TQ1...</div></div>
+        <div id="chartTQ2" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ TQ2...</div></div>
+        <div id="chartTQ3" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ TQ3...</div></div>
+        <div id="chartQ1" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q1...</div></div>
+        <div id="chartQ2" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q2...</div></div>
+        <div id="chartQ3" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q3...</div></div>
+        <div id="chartQ4" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q4...</div></div>
+        <div id="chartQ5" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q5...</div></div>
+        <div id="chartQ6" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q6...</div></div>
+        <div id="chartQ7" class="chart active"><div class="chart-title-placeholder">Đang tải Biểu đồ Q7...</div></div> {# Set Q7 active for initial load test #}
+        <div id="chartQ8" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q8...</div></div>
+        <div id="chartQ9" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q9...</div></div>
+        <div id="chartQ10" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q10...</div></div>
+        <div id="chartQ11" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q11...</div></div>
+        <div id="chartQ12" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q12...</div></div>
+        <div id="chartQ13" class="chart"><div class="chart-title-placeholder">Đang tải Biểu đồ Q13...</div></div>
+    </div>
+
+    <div class="visualization-tooltip"></div>
+
+    {# TẢI CÁC FILE CHART.JS CỦA BẠN #}
+    <script src="{% static 'dashboard_app/js/chartTQ1.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartTQ2.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartTQ3.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ1.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ2.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ3.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ4.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ5.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ6.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ7.js' %}"></script> {# ĐẢM BẢO Q7 ĐƯỢC TẢI SAU CÁC BIẾN GLOBAL #}
+    <script src="{% static 'dashboard_app/js/chartQ8.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ9.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ10.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ11.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ12.js' %}"></script>
+    <script src="{% static 'dashboard_app/js/chartQ13.js' %}"></script>
+
+    <script>
+        // CÁC ĐƯỜNG DẪN DỮ LIỆU GLOBAL
+        const GLOBAL_SUPERSTORE_DATA_PATH = "{% static 'dashboard_app/data/Global_Superstore_cleaned_rfm.csv' %}";
+        const PEOPLE_DATA_PATH = "{% static 'dashboard_app/data/People.csv' %}";
+        const RETURN_DATA_PATH = "{% static 'dashboard_app/data/Return.csv' %}";
+
+        const chartsRendered = {};
+        const chartTitleDisplayElement = document.getElementById("current-chart-label");
+
+        // Debugging logs - hãy giữ lại những dòng này để xem đầu ra trong console
+        console.log("index.html: Script loaded.");
+        console.log("index.html: Global data paths:", { GLOBAL_SUPERSTORE_DATA_PATH, PEOPLE_DATA_PATH, RETURN_DATA_PATH });
+
+        function showChart(chartIdSuffix, chartTitle) {
+            console.log(`showChart called for: ${chartIdSuffix}`);
+            const chartDivId = `chart${chartIdSuffix}`;
+            console.log(`Chart Div ID: ${chartDivId}`);
+
+            chartTitleDisplayElement.innerText = chartTitle || `Biểu đồ ${chartIdSuffix}`;
+
+            // Xóa trạng thái active của tất cả các nút và biểu đồ
+            document.querySelectorAll(".tab-button").forEach(button => {
+                button.classList.remove("active");
+            });
+            document.querySelectorAll(".chart").forEach(chart => {
+                chart.classList.remove("active");
+            });
+
+            // Thêm trạng thái active cho nút và biểu đồ hiện tại
+            const activeChartElement = document.getElementById(chartDivId);
+            const activeButton = document.querySelector(`.tab-button[onclick*="showChart('${chartIdSuffix}'"]`);
+
+            if (activeChartElement) activeChartElement.classList.add("active");
+            if (activeButton) activeButton.classList.add("active");
+
+            const drawFunctionName = `drawChart${chartIdSuffix}`;
+            console.log(`Attempting to call function: ${drawFunctionName}`);
+
+            if (typeof window[drawFunctionName] === 'function') {
+                console.log(`Function ${drawFunctionName} found.`);
+                if (!chartsRendered[chartDivId]) {
+                    console.log(`Chart ${chartDivId} not yet rendered. Proceeding to render.`);
+                    const placeholder = activeChartElement.querySelector('.chart-title-placeholder');
+                    if(placeholder) placeholder.remove(); // Xóa placeholder khi bắt đầu vẽ
+
+                    let dataPathToPassForMainChart;
+                    let dataPathToPassForAuxiliaryChart;
+
+                    switch(chartIdSuffix) {
+                        case 'TQ1':
+                        case 'Q1':
+                        case 'Q2':
+                        case 'Q3':
+                        case 'Q4':
+                        case 'Q5':
+                        case 'Q6':
+                        case 'Q7': // ĐẢM BẢO Q7 SỬ DỤNG GLOBAL_SUPERSTORE_DATA_PATH
+                        case 'Q8':
+                        case 'Q9':
+                        case 'Q10':
+                        case 'Q11':
+                        case 'TQ2':
+                        case 'TQ3':
+                            dataPathToPassForMainChart = GLOBAL_SUPERSTORE_DATA_PATH;
+                            break;
+                        case 'Q12':
+                            dataPathToPassForMainChart = GLOBAL_SUPERSTORE_DATA_PATH;
+                            dataPathToPassForAuxiliaryChart = RETURN_DATA_PATH;
+                            break;
+                        case 'Q13': // Nếu Q13 dùng People.csv
+                            dataPathToPassForMainChart = GLOBAL_SUPERSTORE_DATA_PATH;
+                            break;
+                        default:
+                            dataPathToPassForMainChart = GLOBAL_SUPERSTORE_DATA_PATH;
+                            break;
+                    }
+                    console.log(`Data path(s) passed to ${drawFunctionName}:`, dataPathToPassForMainChart, dataPathToPassForAuxiliaryChart || 'N/A');
+
+                    // GỌI HÀM VẼ VỚI CÁC THAM SỐ PHÙ HỢP
+                    const tooltipElement = d3.select(".visualization-tooltip"); // Lấy tooltip chung
+                    if (chartIdSuffix === 'Q12') {
+                        window[drawFunctionName](`#${chartDivId}`, tooltipElement, dataPathToPassForMainChart, dataPathToPassForAuxiliaryChart);
+                    } else {
+                        window[drawFunctionName](`#${chartDivId}`, tooltipElement, dataPathToPassForMainChart);
+                    }
+                    chartsRendered[chartDivId] = true;
+                } else {
+                    console.log(`Chart ${chartDivId} already rendered (skipping re-render).`);
+                }
+            } else {
+                console.error(`Function ${drawFunctionName} NOT found on window object. Check if the JS file is loaded and the function is global.`);
+                if (activeChartElement) {
+                    activeChartElement.innerHTML = `<p style='color:red;'>Lỗi: Hàm vẽ ${drawFunctionName}() không được định nghĩa hoặc không truy cập được.</p>`;
+                }
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            console.log("DOMContentLoaded fired. Attempting to display default chart (TQ1).");
+            // Mở tab TQ1 mặc định khi trang tải
+            showChart('TQ1', 'Biểu đồ TQ1: Top 10 Doanh thu Quốc gia');
+            console.log("Default chart (TQ1) display initiated.");
+        });
+    </script>
+</body>
+</html>
